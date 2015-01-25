@@ -33,12 +33,12 @@ users=unique(allData$UserID);
 #}
 
 #uLen=length(users);
-uLen=20;
-newTabel=array(0,dim=c(40,40));
-for(i in 1:19){
+uLen=1000;
+newTabel=array(0,dim=c(uLen,uLen));
+for(i in 1:uLen-1){
   origin=users[i];
   mOrigin=allData[allData$UserID==origin,c('MovieID','Rating')];
-  for(j in i+1:20){
+  for(j in (i+1):uLen){
     other=users[j];
     mOther=allData[allData$UserID==other,c('MovieID','Rating')];
     inte=intersect(mOrigin$MovieID,mOther$MovieID);
@@ -47,7 +47,9 @@ for(i in 1:19){
     r1=mOrigin[mOrigin$MovieID==inte,c('Rating')];
   r2=mOther[mOther$MovieID==inte,c('Rating')];
   delta=r1-r2;
-  newTabel[i,j]=sqrt(sum(delta^2));
+  newTabel[j,i]=sqrt(sum(delta^2));
   }
+  print(i);
 }
 
+f1=newTabel[1:7,1:7];

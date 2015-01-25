@@ -5,8 +5,6 @@ allData=dbGetQuery(con,'SELECT * FROM ratings');
 avgs=dbGetQuery(con,'SELECT MovieID,count(Rating),avg(Rating) FROM ratings group by MovieID');
 movies=avgs$MovieID;
 users=unique(allData$UserID);
-
-#covert vertical to horizontal
 hor=array(NA,dim=c(length(users),length(movies)));
 rownames(hor)=users;
 colnames(hor)=movies;
@@ -19,19 +17,8 @@ for(i in 1:len){
 }
 
 
-#outlier detection
-unLike=array(0,dim=c(uLen));
-mAvg=avgs[,c("avg(Rating)")];
-for(i in 1:uLen){
-  d=hor[i,]-mAvg;
-  d[is.na(d)]=0
-  unLike[i]=sqrt(sum(d^2));
-}
-tr=quantile(unLike,0.99);
-outliers=which(unLike>tr);
 
 
-#detemine dissimilarity matrix
 uLen=length(users);
 newTabel=array(0,dim=c(uLen,uLen));
 for(i in 1:uLen-1){
@@ -43,13 +30,6 @@ for(i in 1:uLen-1){
   print(i);
 }
 
-#clustering
-ws=60;
-window=newTabel[1:ws,1:ws];
+window=newTabel[1:60,1:60];
 h=hclust(as.dist(window));
 clus=cutree(h,k=6);
-
-#classification
-library('caret');
-train(hor[1:60,],clus);
-
