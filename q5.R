@@ -23,12 +23,13 @@ print('Finished initial calculations.');
 
 # Find users with strange votes counts
 library('outliers')
+library('hash')
 
 calculateUsersRatingsCount <- function (test=FALSE) {
-  ratingsCount <- array(0, dim=uLen);
-  rownames(ratingsCount) <- users;
+  rc <- hash(keys=users, values=array(0, uLen));
   for (i in 1:len) {
-    ratingsCount[c(toString(rUsers[i]))] <- ratingsCount[c(toString(rUsers[i]))] + 1;
+    k <- toString(rUsers[i]);
+    rc[[k]] <- rc[[k]] + 1;
     if ((i > 0) && (i %% 10000 == 0)) {
       printf('progress: i=%d', i);
     }
@@ -36,12 +37,21 @@ calculateUsersRatingsCount <- function (test=FALSE) {
       break;
     }
   }
-  return(ratingsCount);
+  rrc <- array(0, uLen);
+  rownames(rrc) = users;
+  for (i in 1:uLen) {
+    k <- toString(rUsers[i]);
+    rrc[[k]] <- rc[[k]];
+  }
+  if (!test) {
+    write.table(rrc, file='data/ratingsCount');
+  }
+  return(rrc);
 };
 
 badRatingUserDetection1 <- function (ratingsCount) {
   userOutlierScore <- scores(ratingsCount, type="iqr");   # type=z/t/chisq/iqr/mad
-  badRatingUsers = names(x[x>quantile(x, .99)]);
+  badRatingUsers <- names(userOutlierScore[userOutlierScore>quantile(userOutlierScore, .99)]);
   return(badRatingUsers);
 };
 
@@ -51,7 +61,10 @@ badRatingUserDetection2 <- function (ratingsCount) {
   return(badRatingUsers);
 };
 
-print('=> Detecting Outlier Users (by ratings count)...');
-ratingsCount <- calculateUsersRatingsCount(test=TRUE);
-badRatingUsers <- badRatingUserDetection2(ratingsCount);
-print(badRatingUsers);
+detectOutlierRaters <- function (test=FALSE) {
+  print('=> Detecting Outlier Users (by ratings count)...');
+  ratingsCount <- calculateUsersRatingsCount(test=test);
+  print(summary(ratingsCount));
+  badRatingUsers <- badRatingUserDetection1(ratingsCount);
+  print(badRatingUsers);
+}
