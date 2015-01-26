@@ -1,6 +1,7 @@
 ##q1,q2,q9
 
 library('RMySQL');
+printf <- function(...) invisible(print(sprintf(...)))
 con = dbConnect(dbDriver("MySQL"), user = "root", password = "", dbname = "movies2");
 allData=dbGetQuery(con,'SELECT * FROM ratings');
 avgs=dbGetQuery(con,'SELECT MovieID,count(Rating),avg(Rating) FROM ratings group by MovieID');
@@ -157,9 +158,73 @@ movieCluster <- function () {
 clus3 <- movieCluster();
 
 
+# Outlier User Detection
+# Find users with strange votes counts
+library('outliers')
+library('hash')
+
+calculateUsersRatingsCount <- function (test=FALSE) {
+  rc <- hash(keys=users, values=array(0, uLen));
+  for (i in 1:len) {
+    k <- toString(rUsers[i]);
+    rc[[k]] <- rc[[k]] + 1;
+    if ((i > 0) && (i %% 10000 == 0)) {
+      printf('progress: i=%d', i);
+    }
+    if ((test) && (i >= 10000)) {
+      break;
+    }
+  }
+  rrc <- array(0, uLen);
+  rownames(rrc) = users;
+  for (i in 1:uLen) {
+    k <- toString(rUsers[i]);
+    rrc[[k]] <- rc[[k]];
+  }
+  if (!test) {
+    write.table(rrc, file='data/ratingsCount');
+  }
+  return(rrc);
+};
+
+calculateUsersRatingsCount2 <- function (test=FALSE) {
+  ur <- dbGetQuery(con,'SELECT UserID,count(*) as c FROM ratings group by UserID');
+  us1 <- ur$UserID;
+  counts <- ur$c;
+  l <- length(us1);
+  rc <- array(0, l);
+  rownames(rc) <- us1;
+  for (i in 1:l) {
+    k <- toString(us1[i]);
+    rc[[k]] <- counts[[i]];
+  }
+  return(rc);
+}
+
+badRatingUserDetection1 <- function (ratingsCount) {
+  userOutlierScore <- scores(ratingsCount, type="iqr");   # type=z/t/chisq/iqr/mad
+  badRatingUsers <- names(userOutlierScore[userOutlierScore>quantile(userOutlierScore, .99)]);
+  return(badRatingUsers);
+};
+
+badRatingUserDetection2 <- function (ratingsCount) {
+  normalUsers <- rm.outlier(ratingsCount);
+  badRatingUsers <- setdiff(names(ratingsCount), names(normalUsers));
+  return(badRatingUsers);
+};
+
+detectOutlierRaters <- function (test=FALSE) {
+  print('=> Detecting Outlier Users (by ratings count)...');
+  ratingsCount <- calculateUsersRatingsCount2(test=test);
+  print(summary(ratingsCount));
+  badRatingUsers <- badRatingUserDetection1(ratingsCount);
+  print(badRatingUsers);
+}
+
+
 ##q7
 #Favorite Ganre Of A User
-library('RMySQL');
+favGanre <- function (hor) {
 movie_ganre=dbGetQuery(con,'SELECT * FROM ganre');
 avgs=dbGetQuery(con,'SELECT MovieID,count(Rating),avg(Rating) FROM ratings group by MovieID');
 ganres=unique(movie_ganre$ganre);
@@ -198,12 +263,12 @@ rm(movie_ganre_hor);
 rm(ganres);
 rm(i);
 rm(index);
-
+}
 
 
 ##q8
 #Favorite actor Of A User
-library('RMySQL');
+favActor <- function (hor) {
 movie_actor=dbGetQuery(con,'SELECT movie_id,person_id FROM cast_info  WHERE role_id<=2');
 actors=dbGetQuery(con,'SELECT person_id,count(*) as freq FROM cast_info WHERE role_id<=2 group by person_id having freq>10');
 avgs=dbGetQuery(con,'SELECT MovieID,count(Rating),avg(Rating) FROM ratings group by MovieID');
@@ -239,3 +304,4 @@ rm(movie_actor_hor);
 rm(movies);
 rm(actors);
 rm(movie_actor);
+}
