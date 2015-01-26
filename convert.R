@@ -1,10 +1,12 @@
+##q1,q2,q9
+
 library('RMySQL');
-library('sqldf');
 con = dbConnect(dbDriver("MySQL"), user = "root", password = "", dbname = "movies2");
 allData=dbGetQuery(con,'SELECT * FROM ratings');
 avgs=dbGetQuery(con,'SELECT MovieID,count(Rating),avg(Rating) FROM ratings group by MovieID');
 movies=avgs$MovieID;
 users=unique(allData$UserID);
+
 
 #covert vertical to horizontal
 hor=array(NA,dim=c(length(users),length(movies)));
@@ -17,10 +19,14 @@ len=length(rMovies);
 for(i in 1:len){
   hor[toString(rUsers[i]),toString(rMovies[i])]=rRatings[i];
 }
-
-
+rm(con);
+rm(rMovies);
+rm(rUsers);
+rm(rRatings);
+rm(allData);
 
 #outlier detection
+uLen=length(users);
 unLike=array(0,dim=c(uLen));
 mAvg=avgs[,c("avg(Rating)")];
 for(i in 1:uLen){
@@ -30,24 +36,26 @@ for(i in 1:uLen){
 }
 tr=quantile(unLike,0.99);
 outliers=which(unLike>tr);
-
+rm(mAvg);
+rm(avg);
+rm(tr);
+rm(d);
 
 #detemine dissimilarity matrix
-uLen=length(users);
-newTabel=array(0,dim=c(uLen,uLen));
+diff=array(0,dim=c(uLen,uLen));
 for(i in 1:uLen-1){
   for(j in (i+1):uLen){
     delta=hor[i,]-hor[j,];
     delta[is.na(delta)]=0
-    newTabel[j,i]=sqrt(sum(delta^2));
+    diff[j,i]=sqrt(sum(delta^2));
   }
   print(i);
 }
-
-
+rm(delta);
+rm(uLen);
 #remove outliers
 
-inLiersDiff=newTabel;
+inLiersDiff=diff;
 inLierUsers=users;
 it=0;
 inLierUnLike=unLike;
@@ -61,25 +69,41 @@ for(co in outliers){
   print(co-it);
 }
 
+rm(co);
+rm(it);
+
 #clustering
 
 h2=hclust(as.dist(inLiersDiff));
 clus2=cutree(h2,k=6);
+rm(inLierUnLike);
+rm(inLierUsers);
+rm(inLiersDiff);
+rm(unLike);
+rm(diff);
 
+##q3
 #classificatio
 library('caret');
-td=as.data.frame(t(t(inLiersHor[1:100,1:400])));
-tl=as.factor(as.factor(t(t(clus2[1:100]))));
-fit1=train(td,tl,method = 'AdaBoost.M1',tuneGrid = data.frame(.maxdepth=5,.mfinal=4,.coeflearn='Breiman'));
-res=predict(fit1,td[,]);
+td=as.data.frame(t(t(inLiersHor)));
+tl=as.factor(as.factor(t(t(clus2))));
+fit=train(td,tl,method = 'AdaBoost.M1',tuneGrid = data.frame(.maxdepth=5,.mfinal=4,.coeflearn='Breiman'));
+rm(inLiersHor);
+rm(users);
+rm(movies);
+rm(td);
+rm(rl);
 
 
+##q4,q6
 #Movie Clustering
-
+library('RMySQL');
+con = dbConnect(dbDriver("MySQL"), user = "root", password = "", dbname = "movies2");
+allTagData=dbGetQuery(con,'SELECT MovieID , Tag FROM tags ');
 tagFreqs=dbGetQuery(con,'SELECT Tag , count(*) as freq FROM tags group by Tag having freq>60 order by freq desc');      
 tags=tagFreqs$Tag;
-#movies=t(dbGetQuery(con,'SELECT distinct FROM title'));
-allTagData=dbGetQuery(con,'SELECT MovieID , Tag FROM tags ');
+rm(tagFreqs);
+rm(con);
 movies=unique(allTagData$MovieID);
 tagHor=array(FALSE,c(length(movies),length(tags)));
 rownames(tagHor)=movies;
@@ -89,14 +113,15 @@ rTags=allTagData$Tag;
 len=length(rMovies);
 for(i in 1:len){
   if ((length(which(tags==rTags[i])) > 0)) {
-    print(rMovies[i]);
-    print(rTags[i]);
-    
     tagHor[toString(rMovies[i]),toString(rTags[i])]=TRUE;
   }
   
   if ( i %% 1000 == 0) {print(i)} 
 }
+rm(rMovies);
+rm(rTags)
+rm(len);
+rm(i);
 
 mLen=length(movies);
 movieDiff=array(0,dim=c(mLen,mLen));
@@ -107,13 +132,21 @@ for(i in 1:mLen-1){
   }
   print(i);
 }
-h3=hclust(as.dist(movieDiff[1:100,1:100]));
+h3=hclust(as.dist(movieDiff));
 clus3=cutree(h3,k=5);
+rm(i);
+rm(j);
+rm(delta);
+rm(mLen);
+rm(movieDiff);
+rm(tagHor);
 
-
+##q7
 #Favorite Ganre Of A User
-
+library('RMySQL');
+con = dbConnect(dbDriver("MySQL"), user = "root", password = "", dbname = "movies2");
 movie_ganre=dbGetQuery(con,'SELECT * FROM ganre');
+avgs=dbGetQuery(con,'SELECT MovieID,count(Rating),avg(Rating) FROM ratings group by MovieID');
 ganres=unique(movie_ganre$ganre);
 movies=avgs$MovieID;
 movie_ganre_hor=array(0,c(length(movies),length(ganres)));
@@ -131,6 +164,13 @@ for(i in 1:len){
   if ( i %% 1000 == 0) {print(i)} 
 }
 
+rm(con);
+rm(movie_ganre);
+rm(len);
+rm(rMovies);
+rm(rGanres);
+rm(avgs);
+
 hor[is.na(hor)]=0;
 user_ganre=hor %*% movie_ganre_hor;
 uLen=length(users);
@@ -139,13 +179,22 @@ for(i in 1:uLen){
   index=which.max(user_ganre[i,]);
   user_favorite[i]=ganres[index];
 }
+rm(uLen);
+rm(movie_ganre_hor);
+rm(ganres);
+rm(i);
+rm(index);
 
 
 
+##q8
 #Favorite actor Of A User
-
+library('RMySQL');
+con = dbConnect(dbDriver("MySQL"), user = "root", password = "", dbname = "movies2");
 movie_actor=dbGetQuery(con,'SELECT movie_id,person_id FROM cast_info  WHERE role_id<=2');
 actors=dbGetQuery(con,'SELECT person_id,count(*) as freq FROM cast_info WHERE role_id<=2 group by person_id having freq>10');
+avgs=dbGetQuery(con,'SELECT MovieID,count(Rating),avg(Rating) FROM ratings group by MovieID');
+
 actors=actors$person_id;
 movies=avgs$MovieID;
 movie_actor_hor=array(0,c(length(movies),length(actors)));
@@ -163,12 +212,18 @@ for(i in 1:len){
   if ( i %% 1000 == 0) {print(i)} 
 }
 
+rm(rMovies);
+rm(rActors);
+tm(len);
+rm(i);
+rm(con);
+
 hor[is.na(hor)]=0;
 user_actor=hor %*% movie_actor_hor;
-uLen=length(users);
-user_favorite=array(NA,uLen);
-for(i in 1:uLen){
-  index=which.max(user_ganre[i,]);
-  user_favorite[i]=ganres[index];
-}
 
+rm(avgs);
+rm(hor);
+rm(movie_actor_hor);
+rm(movies);
+rm(actors);
+rm(movie_actor);
