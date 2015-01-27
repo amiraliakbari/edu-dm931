@@ -233,6 +233,8 @@ detectOutlierRaters <- function (test=FALSE) {
   print(summary(ratingsCount));
   badRatingUsers <- badRatingUserDetection1(ratingsCount);
   print(badRatingUsers);
+  underratings <- names(ratingsCount[ratingsCount<12]);
+  return(c(underratings,badRatingUsers));
 }
 
 
