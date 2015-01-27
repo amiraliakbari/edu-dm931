@@ -2,12 +2,16 @@
 
 library('RMySQL');
 printf <- function(...) invisible(print(sprintf(...)))
+
+print('786');
+#con = dbConnect(dbDriver("MySQL"), user = "dm", password = "a", dbname = "Movie_2");
 con = dbConnect(dbDriver("MySQL"), user = "root", password = "", dbname = "movies2");
 allData=dbGetQuery(con,'SELECT * FROM ratings');
 avgs=dbGetQuery(con,'SELECT MovieID,count(Rating),avg(Rating) FROM ratings group by MovieID');
 movies=avgs$MovieID;
 users=unique(allData$UserID);
-test <- FALSE;
+test <- TRUE;
+print('Initial data loaded');
 
 
 #covert vertical to horizontal
@@ -21,6 +25,8 @@ createRatingsMatrix <- function (allData, users) {
   len=length(rMovies);
   for(i in 1:len){
     hor[toString(rUsers[i]),toString(rMovies[i])]=rRatings[i];
+    if ( i %% 10000 == 0) {print(i)}
+    if ( test && (i >= 10000)) {break}
   }
   rm(rMovies); rm(rUsers); rm(rRatings);
   return(hor);
@@ -39,8 +45,8 @@ detectUnlikelyUsers <- function (hor, avgs, users) {
   }
   tr=quantile(unLike,0.99);
   outliers=which(unLike>tr);
-  rm(mAvg); rm(avg); rm(tr); rm(d);
-  return(outliers,unLike);
+  rm(mAvg); rm(tr); rm(d);
+  return(c(outliers,unLike));
 }
 
 
@@ -54,7 +60,8 @@ calculateUsersDiff <- function (hor, users, outliers=FALSE, unLike=FALSE) {
       delta[is.na(delta)]=0
       diff[j,i]=sqrt(sum(delta^2));
     }
-    print(i);
+    if ( i %% 10 == 0) {print(i)}
+    if ( test && (i >= 10)) {break}
   }
   rm(delta); rm(uLen);
 
@@ -77,7 +84,7 @@ calculateUsersDiff <- function (hor, users, outliers=FALSE, unLike=FALSE) {
   }
 
   rm(inLierUnLike); rm(inLierUsers); rm(unLike); rm(diff);
-  return(inLiersHor,inLiersDiff);
+  return(c(inLiersHor,inLiersDiff));
 }
 
 
@@ -91,11 +98,17 @@ clusterUsers <- function (inLiersDiff) {
 
 # Q1 & Q2
 hor <- createRatingsMatrix(allData, users);
+print('matrix converted');
 rm(allData);
-outliers, unLike <- detectUnlikelyUsers(hor, avgs, users);
-inLiersHor, inLiersDiff <- calculateUsersDiff(hor, users, outliers=outliers, unLike=unLike);
+r <- detectUnlikelyUsers(hor, avgs, users);
+outliers <- r[1]; unLike <- r[2];
+print('outliers detected');
+r <- calculateUsersDiff(hor, users, outliers=outliers, unLike=unLike);
+inLiersHor <- r[1]; inLiersDiff <- r[2];
+print('diff calculated');
 clus2 <- clusterUsers(inLiersDiff);
 rm(inLiersDiff);
+print('clustering done');
 
 
 #classification
@@ -112,6 +125,7 @@ trainClassifier <- function (inLiersHor, clusters) {
 # Q3
 fit <- trainClassifier(inLiersHor, clus2);
 rm(inLiersHor); rm(users); rm(movies);
+print('classifier trained');
 
 
 #Movie Clustering
